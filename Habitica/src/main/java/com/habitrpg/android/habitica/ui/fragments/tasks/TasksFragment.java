@@ -58,6 +58,8 @@ import com.mikepenz.materialdrawer.interfaces.OnCheckedChangeListener;
 import com.mikepenz.materialdrawer.model.SectionDrawerItem;
 import com.mikepenz.materialdrawer.model.SwitchDrawerItem;
 import com.mikepenz.materialdrawer.model.interfaces.IDrawerItem;
+import com.raizlabs.android.dbflow.sql.builder.Condition;
+import com.raizlabs.android.dbflow.sql.language.Select;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -131,7 +133,7 @@ public class TasksFragment extends BaseMainFragment implements OnCheckedChangeLi
         this.usesTabLayout = true;
         this.displayingTaskForm = false;
         super.onCreateView(inflater, container, savedInstanceState);
-        View v = inflater.inflate(R.layout.fragment_tasks, container, false);
+        View v = inflater.inflate(R.layout.fragment_viewpager, container, false);
 
 
         viewPager = (ViewPager) v.findViewById(R.id.view_pager);
@@ -266,6 +268,8 @@ public class TasksFragment extends BaseMainFragment implements OnCheckedChangeLi
                                                         itemKeys.add(item.key);
                                                     }
                                                     itemKeys.add("potion");
+                                                    if (user.getFlags().getArmoireEnabled())
+                                                        itemKeys.add("armoire");
 
                                                     contentCache.GetItemDataList(itemKeys, new ContentCache.GotContentEntryCallback<List<ItemData>>() {
                                                         @Override
@@ -280,6 +284,19 @@ public class TasksFragment extends BaseMainFragment implements OnCheckedChangeLi
                                                                 reward.setType("reward");
                                                                 reward.specialTag = "item";
                                                                 reward.setId(item.key);
+
+                                                                if (item.key.equals("armoire")) {
+                                                                    if (user.getFlags().getArmoireEmpty()) {
+                                                                        reward.notes = getResources().getString(R.string.armoireNotesEmpty);
+                                                                    } else {
+                                                                        long gearCount = new Select().count()
+                                                                                .from(ItemData.class)
+                                                                                .where(Condition.CombinedCondition.begin(Condition.column("klass").eq("armoire"))
+                                                                                        .and(Condition.column("owned").isNull())
+                                                                                ).count();
+                                                                        reward.notes = getResources().getString(R.string.armoireNotesFull, gearCount);
+                                                                    }
+                                                                }
 
                                                                 buyableItems.add(reward);
                                                             }
@@ -371,10 +388,17 @@ public class TasksFragment extends BaseMainFragment implements OnCheckedChangeLi
         if (this.displayingTaskForm) {
             return;
         }
+
+        String allocationMode = "";
+        if (HabiticaApplication.User != null && HabiticaApplication.User.getPreferences() != null){
+            allocationMode = HabiticaApplication.User.getPreferences().getAllocationMode();
+        }
+
         Bundle bundle = new Bundle();
-        bundle.putString("type", type);
-        bundle.putStringArrayList("tagsId", new ArrayList<>(this.getTagIds()));
-        bundle.putStringArrayList("tagsName", new ArrayList<>(this.getTagNames()));
+        bundle.putString(TaskFormActivity.TASK_TYPE_KEY, type);
+        bundle.putStringArrayList(TaskFormActivity.TAG_IDS_KEY, new ArrayList<>(this.getTagIds()));
+        bundle.putStringArrayList(TaskFormActivity.TAG_NAMES_KEY, new ArrayList<>(this.getTagNames()));
+        bundle.putString(TaskFormActivity.ALLOCATION_MODE_KEY, allocationMode);
 
         Intent intent = new Intent(activity, TaskFormActivity.class);
         intent.putExtras(bundle);
